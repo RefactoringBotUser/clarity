@@ -28,13 +28,14 @@ public abstract class AbstractFileRunner extends AbstractRunner implements FileR
 
     public AbstractFileRunner(Source source, EngineType engineType) throws IOException {
         super(engineType);
+        engineType.readHeader(source);
         this.source = source;
         this.tick = -1;
-        engineType.skipHeaderOffsets(source);
     }
 
-    protected void initAndRunWith(Object... processors) {
-        initWithProcessors(processors);
+    protected void initAndRunWith(Object... processors) throws IOException {
+        initWithProcessors(this, getEngineType(), source, processors);
+        engineType.emitHeader();
         context.createEvent(OnInputSource.class, Source.class, LoopController.class).raise(source, loopController);
     }
 
@@ -67,6 +68,10 @@ public abstract class AbstractFileRunner extends AbstractRunner implements FileR
     @Override
     public Source getSource() {
         return source;
+    }
+
+    public int getLastTick() throws IOException {
+        return source.getLastTick();
     }
 
 }

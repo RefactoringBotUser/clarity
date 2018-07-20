@@ -14,14 +14,16 @@ public abstract class UnsafeBitStreamBase extends BitStream {
     protected static final long base;
 
     static {
+        Unsafe u = null;
         try {
             Constructor<Unsafe> unsafeConstructor = Unsafe.class.getDeclaredConstructor();
             unsafeConstructor.setAccessible(true);
-            unsafe = unsafeConstructor.newInstance();
-            base = unsafe.arrayBaseOffset(byte[].class);
+            u = unsafeConstructor.newInstance();
         } catch (Exception e) {
-            throw Util.toClarityException(e);
+            Util.uncheckedThrow(e);
         }
+        unsafe = u;
+        base = unsafe.arrayBaseOffset(byte[].class);
     }
 
     protected final byte[] data;
@@ -40,14 +42,17 @@ public abstract class UnsafeBitStreamBase extends BitStream {
 
     protected void checkAccessRelative(long offs, long n) {
         if (offs < 0L) {
-            throw new ClarityException(
-                "Invalid memory access: Tried to access array of length %d at offset %d", data.length, offs
-            );
-        }
-        if (offs + n > bound) {
-            throw new ClarityException(
-                "Invalid memory access: Tried to access array of length %d at offset %d", data.length, offs + n
-            );
+            accessFailed(offs);
+        } else  if (offs + n > bound) {
+            accessFailed(offs + n);
         }
     }
+
+    private void accessFailed(long offs) {
+        throw new ClarityException(
+                "Invalid memory access: Tried to access array of length %d at offset %d", data.length, offs
+        );
+    }
+
+
 }

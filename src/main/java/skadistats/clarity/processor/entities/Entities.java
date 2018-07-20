@@ -1,6 +1,7 @@
 package skadistats.clarity.processor.entities;
 
 import com.google.protobuf.ByteString;
+import org.slf4j.Logger;
 import skadistats.clarity.ClarityException;
 import skadistats.clarity.LogChannel;
 import skadistats.clarity.decoder.FieldReader;
@@ -10,9 +11,9 @@ import skadistats.clarity.event.Event;
 import skadistats.clarity.event.Insert;
 import skadistats.clarity.event.InsertEvent;
 import skadistats.clarity.event.Provides;
-import skadistats.clarity.logger.Logger;
-import skadistats.clarity.logger.Logging;
+import skadistats.clarity.logger.PrintfLoggerFactory;
 import skadistats.clarity.model.DTClass;
+import skadistats.clarity.model.EngineId;
 import skadistats.clarity.model.EngineType;
 import skadistats.clarity.model.Entity;
 import skadistats.clarity.model.StringTable;
@@ -34,13 +35,13 @@ import skadistats.clarity.wire.common.proto.NetworkBaseTypes;
 import java.util.Iterator;
 import java.util.LinkedList;
 
-@Provides({ UsesEntities.class, OnEntityCreated.class, OnEntityUpdated.class, OnEntityDeleted.class, OnEntityEntered.class, OnEntityLeft.class, OnEntityUpdatesCompleted.class })
+@Provides({UsesEntities.class, OnEntityCreated.class, OnEntityUpdated.class, OnEntityDeleted.class, OnEntityEntered.class, OnEntityLeft.class, OnEntityUpdatesCompleted.class})
 @UsesDTClasses
 public class Entities {
 
     public static final String BASELINE_TABLE = "instancebaseline";
 
-    private static final Logger log = Logging.getLogger(LogChannel.entities);
+    private static final Logger log = PrintfLoggerFactory.getLogger(LogChannel.entities);
 
     private Entity[] entities;
     private int[] deletions;
@@ -215,7 +216,7 @@ public class Entities {
                         throw new ClarityException("class for new entity %d is %d, but no dtClass found!.", eIdx, dtClassId);
                     }
                     int serial = stream.readUBitInt(engineType.getSerialBits());
-                    if (engineType == EngineType.SOURCE2) {
+                    if (engineType.getId() == EngineId.SOURCE2) {
                         // TODO: there is an extra VarInt encoded here for S2, figure out what it is
                         stream.readVarUInt();
                     }
@@ -288,7 +289,7 @@ public class Entities {
 
         }
 
-        if (message.getIsDelta()) {
+        if (engineType.handleDeletions() && message.getIsDelta()) {
             int n = fieldReader.readDeletions(stream, engineType.getIndexBits(), deletions);
             for (int i = 0; i < n; i++) {
                 eIdx = deletions[i];
@@ -381,9 +382,10 @@ public class Entities {
     public Iterator<Entity> getAllByPredicate(final Predicate<Entity> predicate) {
         return new SimpleIterator<Entity>() {
             int i = -1;
+
             @Override
             public Entity readNext() {
-                while(++i < entities.length) {
+                while (++i < entities.length) {
                     Entity e = entities[i];
                     if (e.isValid() && predicate.apply(e)) {
                         return e;
@@ -401,12 +403,12 @@ public class Entities {
 
     public Iterator<Entity> getAllByDtName(final String dtClassName) {
         return getAllByPredicate(
-            new Predicate<Entity>() {
-                @Override
-                public boolean apply(Entity e) {
-                    return dtClassName.equals(e.getDtClass().getDtName());
-                }
-            });
+                new Predicate<Entity>() {
+                    @Override
+                    public boolean apply(Entity e) {
+                        return dtClassName.equals(e.getDtClass().getDtName());
+                    }
+                });
     }
 
     public Entity getByDtName(final String dtClassName) {

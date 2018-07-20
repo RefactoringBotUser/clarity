@@ -1,13 +1,12 @@
 package skadistats.clarity.source;
 
+import skadistats.clarity.ClarityException;
+import skadistats.clarity.model.EngineId;
 import skadistats.clarity.model.EngineType;
-import skadistats.clarity.wire.common.proto.Demo;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.TreeSet;
 
 /**
  * A Source provides clarity with raw replay data.
@@ -27,8 +26,13 @@ import java.util.TreeSet;
  */
 public abstract class Source {
 
-    protected Integer lastTick;
+    private Runnable onLastTickChanged;
+    private EngineType engineType;
+    private Integer lastTick;
 
+    public void notifyOnLastTickChanged(Runnable onLastTickChanged) {
+        this.onLastTickChanged = onLastTickChanged;
+    }
 
     /**
      * returns the current position
@@ -152,50 +156,28 @@ public abstract class Source {
      */
     public EngineType readEngineType() throws IOException {
         try {
-            EngineType et = EngineType.forMagic(new String(readBytes(8)));
-            if (et == null) {
+            engineType = EngineId.typeForMagic(new String(readBytes(8)));
+            if (engineType == null) {
                 throw new IOException();
             }
-            return et;
+            return engineType;
         } catch (IOException e) {
             throw new IOException("given stream does not seem to contain a valid replay");
         }
     }
 
-    /**
-     * gets the positions of all packets containing full string tables up to a given tick
-     *
-     * @param engineType
-     * @param wantedTick the tick
-     * @param packetPositions a set of positions found in previous runs
-     * @throws IOException if the underlying data is invalid
-     */
-    public TreeSet<PacketPosition> getResetPacketsBeforeTick(EngineType engineType, int wantedTick, TreeSet<PacketPosition> packetPositions) throws IOException {
-        int backup = getPosition();
-        PacketPosition wanted = PacketPosition.createPacketPosition(wantedTick, Demo.EDemoCommands.DEM_FullPacket_VALUE, 0);
-        if (packetPositions.tailSet(wanted, true).size() == 0) {
-            PacketPosition basePos = packetPositions.floor(wanted);
-            setPosition(basePos.getOffset());
-            try {
-                while (true) {
-                    int at = getPosition();
-                    int kind = readVarInt32() & ~engineType.getCompressedFlag();
-                    int tick = readVarInt32();
-                    int size = readVarInt32();
-                    PacketPosition pp = PacketPosition.createPacketPosition(tick, kind, at);
-                    if (pp != null) {
-                        packetPositions.add(pp);
-                    }
-                    if (tick >= wantedTick) {
-                        break;
-                    }
-                    skipBytes(size);
-                }
-            } catch (EOFException e) {
-            }
+    protected void setLastTick(int lastTick) {
+        this.lastTick = lastTick;
+        if (onLastTickChanged != null) {
+            onLastTickChanged.run();
         }
-        setPosition(backup);
-        return new TreeSet<>(packetPositions.headSet(wanted, true));
+    }
+
+    protected void determineLastTick() throws IOException {
+        if (engineType == null) {
+            throw new ClarityException("cannot determine last tick before engine type is known");
+        }
+        lastTick = engineType.determineLastTick(this);
     }
 
     /**
@@ -209,10 +191,7 @@ public abstract class Source {
      */
     public int getLastTick() throws IOException {
         if (lastTick == null) {
-            setPosition(8);
-            setPosition(readFixedInt32());
-            skipVarInt32();
-            lastTick = readVarInt32();
+            determineLastTick();
         }
         return lastTick.intValue();
     }

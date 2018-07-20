@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import skadistats.clarity.decoder.Util;
 import skadistats.clarity.decoder.s2.FieldOpType;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Constructor;
 
 public abstract class BitStream {
@@ -40,8 +41,12 @@ public abstract class BitStream {
         0xffffffffffffffffL
     };
 
+    private static final int[] UBV_COUNT = {0, 4, 8, 28};
+    private static final int[] UBVFP_COUNT = {2, 4, 10, 17, 31};
+
     protected int len;
     protected int pos;
+    private final byte[] stringTemp = new byte[32768];
 
     private static final Constructor<BitStream> bitStreamConstructor = BitStreamImplementations.determineConstructor();
 
@@ -49,7 +54,8 @@ public abstract class BitStream {
         try {
             return bitStreamConstructor.newInstance(input);
         } catch (Exception e) {
-            throw Util.toClarityException(e);
+            Util.uncheckedThrow(e);
+            return null;
         }
     }
 
@@ -101,16 +107,21 @@ public abstract class BitStream {
     }
 
     public String readString(int n) {
-        StringBuilder buf = new StringBuilder();
-        while (n > 0) {
-            char c = (char) readUBitInt(8);
+        int o = 0;
+        while (o < n) {
+            byte c = (byte) readUBitInt(8);
             if (c == 0) {
                 break;
             }
-            buf.append(c);
-            n--;
+            stringTemp[o] = c;
+            o++;
         }
-        return buf.toString();
+        try {
+            return new String(stringTemp, 0, o, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            Util.uncheckedThrow(e);
+            return null;
+        }
     }
 
     public long readVarU(int max) {
@@ -159,26 +170,20 @@ public abstract class BitStream {
         // X + Y set -> read 28
 
         int v = readUBitInt(6);
-        switch (v & 48) {
-            case 16:
-                v = (v & 15) | (readUBitInt(4) << 4);
-                break;
-            case 32:
-                v = (v & 15) | (readUBitInt(8) << 4);
-                break;
-            case 48:
-                v = (v & 15) | (readUBitInt(28) << 4);
-                break;
+        int a = v >> 4;
+        if (a == 0) {
+            return v;
+        } else {
+            return (v & 15) | (readUBitInt(UBV_COUNT[a]) << 4);
         }
-        return v;
     }
 
     public int readUBitVarFieldPath() {
-        if (readBitFlag()) return readUBitInt(2);
-        if (readBitFlag()) return readUBitInt(4);
-        if (readBitFlag()) return readUBitInt(10);
-        if (readBitFlag()) return readUBitInt(17);
-        return readUBitInt(31);
+        int i = -1;
+        while (++i < 4) {
+            if (readBitFlag()) break;
+        }
+        return readUBitInt(UBVFP_COUNT[i]);
     }
 
     public float readBitCoord() {

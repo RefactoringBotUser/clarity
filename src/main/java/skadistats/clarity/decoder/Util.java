@@ -3,12 +3,13 @@ package skadistats.clarity.decoder;
 import com.google.protobuf.ByteString;
 import com.rits.cloning.Cloner;
 import org.xerial.snappy.Snappy;
-import skadistats.clarity.ClarityException;
 import skadistats.clarity.decoder.unpacker.Unpacker;
+import skadistats.clarity.source.Source;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.ParameterizedType;
+import java.nio.ByteBuffer;
 
 public class Util {
 
@@ -37,8 +38,27 @@ public class Util {
         try {
             return s.toString(charsetName);
         } catch (UnsupportedEncodingException e) {
-            throw Util.toClarityException(e);
+            Util.uncheckedThrow(e);
+            return null;
         }
+    }
+
+    public static String readFixedZeroTerminated(ByteBuffer buffer, int length) throws IOException {
+        byte[] buf = new byte[length];
+        buffer.get(buf);
+        return zeroTerminatedToString(buf);
+    }
+
+    public static String readFixedZeroTerminated(Source source, int length) throws IOException {
+        byte[] buf = new byte[length];
+        source.readBytes(buf, 0, length);
+        return zeroTerminatedToString(buf);
+    }
+
+    public static String zeroTerminatedToString(byte[] buf) throws IOException {
+        int i = 0;
+        while (buf[i] != 0) i++;
+        return new String(buf, 0, i, "UTF-8");
     }
 
     private static final Cloner CLONER = new Cloner();
@@ -72,16 +92,17 @@ public class Util {
         try {
             Snappy.arrayCopy(src, srcOffset, n, dst, dstOffset);
         } catch (IOException e) {
-            throw Util.toClarityException(e);
+            Util.uncheckedThrow(e);
         }
     }
 
-    public static ClarityException toClarityException(Throwable throwable) {
-        if (throwable instanceof ClarityException) {
-            return (ClarityException) throwable;
-        } else {
-            return new ClarityException(throwable);
-        }
+    public static void uncheckedThrow(Throwable e) {
+        Util.<RuntimeException>uncheckedThrow0(e);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> void uncheckedThrow0(Throwable e) throws E {
+        throw (E) e;
     }
 
 }

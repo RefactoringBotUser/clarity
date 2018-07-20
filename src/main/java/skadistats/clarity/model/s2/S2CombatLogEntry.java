@@ -41,6 +41,11 @@ public class S2CombatLogEntry implements CombatLogEntry {
     }
 
     @Override
+    public int getTargetNameIdx() {
+        return e.getTargetName();
+    }
+
+    @Override
     public boolean hasTargetSourceName() {
         return e.hasTargetSourceName();
     }
@@ -48,6 +53,11 @@ public class S2CombatLogEntry implements CombatLogEntry {
     @Override
     public String getTargetSourceName() {
         return readCombatLogName(e.getTargetSourceName());
+    }
+
+    @Override
+    public int getTargetSourceNameIdx() {
+        return e.getTargetSourceName();
     }
 
     @Override
@@ -61,6 +71,11 @@ public class S2CombatLogEntry implements CombatLogEntry {
     }
 
     @Override
+    public int getAttackerNameIdx() {
+        return e.getAttackerName();
+    }
+
+    @Override
     public boolean hasDamageSourceName() {
         return e.hasDamageSourceName();
     }
@@ -71,6 +86,11 @@ public class S2CombatLogEntry implements CombatLogEntry {
     }
 
     @Override
+    public int getDamageSourceNameIdx() {
+        return e.getDamageSourceName();
+    }
+
+    @Override
     public boolean hasInflictorName() {
         return e.hasInflictorName();
     }
@@ -78,6 +98,11 @@ public class S2CombatLogEntry implements CombatLogEntry {
     @Override
     public String getInflictorName() {
         return readCombatLogName(e.getInflictorName());
+    }
+
+    @Override
+    public int getInflictorNameIdx() {
+        return e.getInflictorName();
     }
 
     @Override
@@ -503,6 +528,176 @@ public class S2CombatLogEntry implements CombatLogEntry {
     @Override
     public int getNetworth() {
         return e.getNetworth();
+    }
+
+    @Override
+    public boolean hasBuildingType() {
+        return e.hasBuildingType();
+    }
+
+    @Override
+    public int getBuildingType() {
+        return e.getBuildingType();
+    }
+
+    @Override
+    public boolean hasModifierElapsedDuration() {
+        return e.hasModifierElapsedDuration();
+    }
+
+    @Override
+    public float getModifierElapsedDuration() {
+        return e.getModifierElapsedDuration();
+    }
+
+    @Override
+    public boolean hasSilenceModifier() {
+        return e.hasSilenceModifier();
+    }
+
+    @Override
+    public boolean isSilenceModifier() {
+        return e.getSilenceModifier();
+    }
+
+    @Override
+    public boolean hasHealFromLifesteal() {
+        return e.hasHealFromLifesteal();
+    }
+
+    @Override
+    public boolean isHealFromLifesteal() {
+        return e.getHealFromLifesteal();
+    }
+
+    @Override
+    public boolean hasModifierPurged() {
+        return e.hasModifierPurged();
+    }
+
+    @Override
+    public boolean isModifierPurged() {
+        return e.getModifierPurged();
+    }
+
+    @Override
+    public boolean hasSpellEvaded() {
+        return e.hasSpellEvaded();
+    }
+
+    @Override
+    public boolean isSpellEvaded() {
+        return e.getSpellEvaded();
+    }
+
+    @Override
+    public boolean hasMotionControllerModifier() {
+        return e.hasMotionControllerModifier();
+    }
+
+    @Override
+    public boolean isMotionControllerModifier() {
+        return e.getMotionControllerModifier();
+    }
+
+    @Override
+    public boolean hasLongRangeKill() {
+        return e.hasLongRangeKill();
+    }
+
+    @Override
+    public boolean isLongRangeKill() {
+        return e.getLongRangeKill();
+    }
+
+    @Override
+    public boolean hasModifierPurgeAbility() {
+        return e.hasModifierPurgeAbility();
+    }
+
+    @Override
+    public int getModifierPurgeAbility() {
+        return e.getModifierPurgeAbility();
+    }
+
+    @Override
+    public boolean hasModifierPurgeNpc() {
+        return e.hasModifierPurgeNpc();
+    }
+
+    @Override
+    public int getModifierPurgeNpc() {
+        return e.getModifierPurgeAbility();
+    }
+
+    @Override
+    public boolean hasRootModifier() {
+        return e.hasRootModifier();
+    }
+
+    @Override
+    public boolean isRootModifier() {
+        return e.getRootModifier();
+    }
+
+    @Override
+    public boolean hasTotalUnitDeathCount() {
+        return e.hasTotalUnitDeathCount();
+    }
+
+    @Override
+    public int getTotalUnitDeathCount() {
+        return e.getTotalUnitDeathCount();
+    }
+
+    @Override
+    public boolean hasAuraModifier() {
+        return e.hasAuraModifier();
+    }
+
+    @Override
+    public boolean isAuraModifier() {
+        return e.getAuraModifier();
+    }
+
+    @Override
+    public boolean hasArmorDebuffModifier() {
+        return e.hasArmorDebuffModifier();
+    }
+
+    @Override
+    public boolean isArmorDebuffModifier() {
+        return e.getArmorDebuffModifier();
+    }
+
+    @Override
+    public boolean hasNoPhysicalDamageModifier() {
+        return e.hasNoPhysicalDamageModifier();
+    }
+
+    @Override
+    public boolean isNoPhysicalDamageModifier() {
+        return e.getNoPhysicalDamageModifier();
+    }
+
+    @Override
+    public boolean hasModifierAbility() {
+        return e.hasModifierAbility();
+    }
+
+    @Override
+    public int getModifierAbility() {
+        return e.getModifierAbility();
+    }
+
+    @Override
+    public boolean hasModifierHidden() {
+        return e.hasModifierHidden();
+    }
+
+    @Override
+    public boolean isModifierHidden() {
+        return e.getModifierHidden();
     }
 
     public String toString() {

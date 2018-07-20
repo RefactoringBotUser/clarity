@@ -1,5 +1,6 @@
 package skadistats.clarity.processor.runner;
 
+import org.slf4j.Logger;
 import skadistats.clarity.ClarityException;
 import skadistats.clarity.LogChannel;
 import skadistats.clarity.decoder.Util;
@@ -15,8 +16,8 @@ import skadistats.clarity.event.UsagePointMarker;
 import skadistats.clarity.event.UsagePointProvider;
 import skadistats.clarity.event.UsagePointType;
 import skadistats.clarity.event.UsagePoints;
-import skadistats.clarity.logger.Logger;
-import skadistats.clarity.logger.Logging;
+import skadistats.clarity.logger.PrintfLoggerFactory;
+import skadistats.clarity.model.EngineId;
 import skadistats.clarity.model.EngineType;
 
 import java.lang.annotation.Annotation;
@@ -32,7 +33,7 @@ import java.util.Set;
 
 public class ExecutionModel {
 
-    private static final Logger log = Logging.getLogger(LogChannel.executionModel);
+    private static final Logger log = PrintfLoggerFactory.getLogger(LogChannel.executionModel);
 
     private final Runner runner;
     private final Map<Class<?>, Object> processors = new HashMap<>();
@@ -42,7 +43,6 @@ public class ExecutionModel {
 
     public ExecutionModel(Runner runner) {
         this.runner = runner;
-        addProcessor(runner);
     }
 
     public void addProcessor(Object processor) {
@@ -96,8 +96,8 @@ public class ExecutionModel {
     }
 
     private boolean supportsEngineType(Provides provides) {
-        for (EngineType engineType : provides.engine()) {
-            if (engineType == runner.getEngineType()) {
+        for (EngineId id : provides.engine()) {
+            if (id == runner.getEngineType().getId()) {
                 return true;
             }
         }
@@ -146,13 +146,20 @@ public class ExecutionModel {
 
     private List<UsagePoint<? extends Annotation>> findUsagePoints(Class<?> searchedClass) {
         List<UsagePoint<? extends Annotation>> ups = new ArrayList<>();
-        for (Annotation classAnnotation : searchedClass.getAnnotations()) {
-            if (classAnnotation.annotationType().isAnnotationPresent(UsagePointMarker.class)) {
-                ups.add(UsagePointType.newInstance(classAnnotation, searchedClass, null));
+        Class<?> c;
+
+        c = searchedClass;
+        while (c != Object.class) {
+            for (Annotation classAnnotation : c.getAnnotations()) {
+                if (classAnnotation.annotationType().isAnnotationPresent(UsagePointMarker.class)) {
+                    ups.add(UsagePointType.newInstance(classAnnotation, searchedClass, null));
+                }
             }
+            c = c.getSuperclass();
         }
-        Class<?> c = searchedClass;
-        while (true) {
+
+        c = searchedClass;
+        while (c != Object.class) {
             for (Method method : c.getDeclaredMethods()) {
                 for (Annotation methodAnnotation : method.getAnnotations()) {
                     if (methodAnnotation.annotationType().isAnnotationPresent(UsagePointMarker.class)) {
@@ -162,10 +169,8 @@ public class ExecutionModel {
                 }
             }
             c = c.getSuperclass();
-            if (c == Object.class) {
-                break;
-            }
         }
+
         return ups;
     }
 
@@ -175,7 +180,7 @@ public class ExecutionModel {
                 try {
                     entry.setValue(entry.getKey().newInstance());
                 } catch (Exception e) {
-                    throw Util.toClarityException(e);
+                    Util.uncheckedThrow(e);
                 }
             }
         }
@@ -183,13 +188,12 @@ public class ExecutionModel {
 
     private void bindInvocationPoints(skadistats.clarity.processor.runner.Context context) {
         for (UsagePoint up : usagePoints) {
-            if (up instanceof InvocationPoint){
+            if (up instanceof InvocationPoint) {
                 try {
-                    ((InvocationPoint)up).bind(context);
+                    ((InvocationPoint) up).bind(context);
                 } catch (IllegalAccessException e) {
-                    throw Util.toClarityException(e);
+                    Util.uncheckedThrow(e);
                 }
-
             }
         }
     }
@@ -203,8 +207,6 @@ public class ExecutionModel {
                         if (fieldAnnotation instanceof Insert) {
                             if (field.getType().isAssignableFrom(Context.class)) {
                                 injectValue(processor, field, runner.getContext(), "cannot inject context");
-                            } else if (field.getType().isAssignableFrom(EngineType.class)) {
-                                injectValue(processor, field, runner.getContext().getEngineType(), "cannot inject engine type");
                             } else {
                                 injectProcessor(processor, field);
                             }
@@ -272,11 +274,11 @@ public class ExecutionModel {
                 continue;
             }
             InitializerMethod im = initializers.get(up.getUsagePointClass());
-            if (im != null){
+            if (im != null) {
                 try {
                     im.invoke(up);
                 } catch (Throwable e) {
-                    throw Util.toClarityException(e);
+                    Util.uncheckedThrow(e);
                 }
             }
         }
@@ -297,7 +299,7 @@ public class ExecutionModel {
     private <A extends Annotation> Set<EventListener<A>> computeListenersForEvent(Class<A> eventType, Class... parameterTypes) {
         Set<EventListener<A>> listeners = new HashSet<>();
         Set<EventListener> eventListeners = processedEvents.get(eventType);
-        if(eventListeners != null) {
+        if (eventListeners != null) {
             for (@SuppressWarnings("unchecked") EventListener<A> listener : eventListeners) {
                 if (listener.isInvokedForParameterClasses(parameterTypes)) {
                     listeners.add(listener);

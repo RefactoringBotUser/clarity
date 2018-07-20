@@ -2,11 +2,13 @@ package skadistats.clarity.processor.stringtables;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ZeroCopy;
+import org.slf4j.Logger;
 import org.xerial.snappy.Snappy;
 import skadistats.clarity.decoder.bitstream.BitStream;
 import skadistats.clarity.event.Insert;
 import skadistats.clarity.event.Provides;
-import skadistats.clarity.model.EngineType;
+import skadistats.clarity.logger.PrintfLoggerFactory;
+import skadistats.clarity.model.EngineId;
 import skadistats.clarity.model.StringTable;
 import skadistats.clarity.processor.reader.OnMessage;
 import skadistats.clarity.processor.runner.Context;
@@ -17,14 +19,24 @@ import skadistats.clarity.wire.s2.proto.S2NetMessages;
 import java.io.IOException;
 import java.util.LinkedList;
 
-@Provides(value = {OnStringTableCreated.class, OnStringTableEntry.class}, engine = EngineType.SOURCE2)
+import static skadistats.clarity.LogChannel.stringtables;
+
+@Provides(value = {OnStringTableCreated.class, OnStringTableEntry.class, OnStringTableClear.class}, engine = EngineId.SOURCE2)
 @StringTableEmitter
 public class S2StringTableEmitter extends BaseStringTableEmitter {
+
+    private final Logger log = PrintfLoggerFactory.getLogger(stringtables);
 
     @Insert
     private Context context;
 
     private final byte[] tempBuf = new byte[0x4000];
+
+    @OnMessage(S2NetMessages.CSVCMsg_ClearAllStringTables.class)
+    public void clearAllStringTables(S2NetMessages.CSVCMsg_ClearAllStringTables msg) {
+        numTables = 0;
+        evClear.raise();
+    }
 
     @OnMessage(S2NetMessages.CSVCMsg_CreateStringTable.class)
     public void onCreateStringTable(S2NetMessages.CSVCMsg_CreateStringTable message) throws IOException {
@@ -81,8 +93,16 @@ public class S2StringTableEmitter extends BaseStringTableEmitter {
                 if (stream.readBitFlag()) {
                     int basis = stream.readUBitInt(5);
                     int length = stream.readUBitInt(5);
-                    nameBuf.append(keyHistory.get(basis).substring(0, length));
-                    nameBuf.append(stream.readString(MAX_NAME_LENGTH - length));
+                    if (basis >= keyHistory.size()) {
+                        for (int k = 0; k < length; k++) {
+                            nameBuf.append('_');
+                        }
+                        nameBuf.append(stream.readString(MAX_NAME_LENGTH));
+                        log.warn("Working around keyHistory underflow. Key '%s' in table '%s' is incomplete.", nameBuf.toString(), table.getName());
+                    } else {
+                        nameBuf.append(keyHistory.get(basis).substring(0, length));
+                        nameBuf.append(stream.readString(MAX_NAME_LENGTH - length));
+                    }
                 } else {
                     nameBuf.append(stream.readString(MAX_NAME_LENGTH));
                 }

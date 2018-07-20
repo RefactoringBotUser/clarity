@@ -1,6 +1,11 @@
 # Clarity 2
 
-Clarity is a parser for Dota 2 replay files written in Java.
+Clarity is a parser for Dota 2 and CSGO replay files written in Java.
+
+# Version 2.3 released
+
+Today (July 16, 2018) version 2.3 has been released. Biggest new feature is the support for reading CSGO replays,
+as well as other small fixes and improvements  
 
 # Replay Data
 
@@ -25,16 +30,16 @@ clarity produces the following data you might be interested in from a replay. Ch
 
 # Usage
 
-Fetch the current stable version (2.1) from Maven Central with
+Fetch the current stable version (2.3) from Maven Central with
 ```XML
 <dependency>
 	<groupId>com.skadistats</groupId>
 	<artifactId>clarity</artifactId>
-	<version>2.1</version>
+	<version>2.3</version>
 </dependency>
 ```
 
-Clarity 2.2 is work in progress and only available as a snapshot, so you got to add a pointer to the
+Clarity 2.4 is work in progress and only available as a snapshot, so you got to add a pointer to the
 repository to your pom.xml (see the [pom.xml of clarity-examples](https://github.com/skadistats/clarity-examples/blob/master/pom.xml), which already does that)
 
 To add the snapshot repository, add the following:
@@ -59,7 +64,7 @@ and then fetch the dependency with:
 <dependency>
 	<groupId>com.skadistats</groupId>
 	<artifactId>clarity</artifactId>
-	<version>2.2-SNAPSHOT</version>
+	<version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
