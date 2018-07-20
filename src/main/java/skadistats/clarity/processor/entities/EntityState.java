@@ -16,12 +16,12 @@ public class EntityState {
         this.propertyState = propertyState;
     }
 
-    public EntityState copy() {
+    public EntityState copy(boolean cloneProperties) {
         return new EntityState(
                 clsId,
                 serial,
                 active,
-                Util.cloneState(propertyState)
+                cloneProperties ? Util.cloneState(propertyState) : propertyState
         );
     }
 }

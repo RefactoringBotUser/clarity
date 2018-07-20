@@ -166,10 +166,9 @@ public class Entities {
             }
             oldFrame = getClientFrame(message.getDeltaFrom(), false);
             if (oldFrame == null) {
-                log.warn("missing client frame for delta update from tick %d", message.getDeltaFrom());
-                return;
+                throw new ClarityException("missing client frame for delta update from tick %d", message.getDeltaFrom());
             }
-            log.debug("performing delta update, using old frame from tick %d", oldFrame.tick);
+            log.debug("performing delta update, using old frame from tick %d", oldFrame.getTick());
         } else {
             for (int i = 0; i < entities.length; i++) {
                 entities[i].updateClientFrame(null);
@@ -185,27 +184,30 @@ public class Entities {
 
         BitStream stream = BitStream.createBitStream(message.getEntityData());
 
-        int eCount = 1 << engineType.getIndexBits();
-        int eIdx;
+        EntityState eState;
         int updateCount = message.getUpdatedEntries();
-        int updateIndex = -1;
+        int updateIndex;
         int updateType;
+        int eIdx = 0;
 
-        for (eIdx = 0; eIdx < eCount; eIdx++) {
-            if (updateCount > 0 && updateIndex == -1) {
+        while (true) {
+            if (updateCount > 0) {
                 updateIndex = eIdx + stream.readUBitVar();
                 updateCount--;
-            }
-            if (updateIndex == eIdx) {
-                updateType = stream.readUBitInt(2);
-                updateIndex = -1;
             } else {
-                updateType = 4;
+                updateIndex = entities.length;
+            }
+            if (eIdx < updateIndex) {
+                if (oldFrame != null) {
+                    newFrame.copyFromOtherFrame(oldFrame, eIdx, updateIndex - eIdx);
+                }
+            }
+            eIdx = updateIndex;
+            if (eIdx == entities.length) {
+                break;
             }
 
-            EntityState eState;
-
-            entities[eIdx].updateClientFrame(newFrame);
+            updateType = stream.readUBitInt(2);
 
             switch (updateType) {
                 case 2:
@@ -233,60 +235,61 @@ public class Entities {
                     }
                     eState = new EntityState(dtClassId, serial, true, propertyState);
                     newFrame.setState(eState, eIdx);
-                    evCreated.raise(entities[eIdx]);
-                    evEntered.raise(entities[eIdx]);
+//                    evCreated.raise(entities[eIdx]);
+//                    evEntered.raise(entities[eIdx]);
                     break;
 
                 case 0:
                     // UPDATE ENTITY
-                    eState = newFrame.cloneState(oldFrame, eIdx);
-                    if (eState == null) {
+                    if (oldFrame == null) {
+                        throw new ClarityException("no old frame on entity update");
+                    }
+                    if (!oldFrame.hasState(eIdx)) {
                         throw new ClarityException("entity at index %d was not found for update.", eIdx);
                     }
+                    eState = oldFrame.getState(eIdx).copy(true);
+                    newFrame.setState(eState, eIdx);
                     if (log.isDebugEnabled()) {
                         log.debug("\tupdate entity: index: %4d, class: %s", eIdx, dtClasses.forClassId(eState.clsId).getDtName());
                     }
                     int nChanged = fieldReader.readFields(stream, dtClasses.forClassId(eState.clsId), eState.propertyState, debug);
-                    evUpdated.raise(entities[eIdx], fieldReader.getFieldPaths(), nChanged);
-                    if (!eState.active) {
-                        eState.active = true;
-                        evEntered.raise(entities[eIdx]);
-                    }
+//                    evUpdated.raise(entities[eIdx], fieldReader.getFieldPaths(), nChanged);
+//                    if (!eState.active) {
+//                        eState.active = true;
+//                        evEntered.raise(entities[eIdx]);
+//                    }
                     break;
 
                 case 3:
                     // DELETE ENTITY
                 case 1:
                     // LEAVE ENTITY
-                    eState = newFrame.copyState(oldFrame, eIdx);
-                    if (eState == null) {
-                        log.warn("entity at index %d was not found when ordered to leave.", eIdx);
-                    } else {
-                        if (log.isDebugEnabled()) {
-                            log.debug("\t%s entity: index: %4d, class: %s", updateType == 3 ? "deleting" : "removing", eIdx, dtClasses.forClassId(eState.clsId).getDtName());
-                        }
-                        if (eState.active) {
-                            eState.active = false;
-                            evLeft.raise(entities[eIdx]);
-                        }
-                        if (updateType == 3) {
-                            evDeleted.raise(entities[eIdx]);
-                            newFrame.setState(null, eIdx);
-                        }
+                    if (oldFrame == null) {
+                        throw new ClarityException("no old frame on entity leave");
                     }
-
-                    break;
-
-                case 4:
-                    // PRESERVE ENTITY
-                    if (oldFrame != null) {
-                        EntityState s = oldFrame.getState(eIdx);
-                        newFrame.setState(s, eIdx);
+                    if (!oldFrame.hasState(eIdx)) {
+                        throw new ClarityException("entity at index %d was not found when ordered to leave.", eIdx);
+                    }
+                    eState = oldFrame.getState(eIdx).copy(false);
+                    if (log.isDebugEnabled()) {
+                        log.debug("\t%s entity: index: %4d, class: %s", updateType == 3 ? "deleting" : "removing", eIdx, dtClasses.forClassId(eState.clsId).getDtName());
+                    }
+                    if (!eState.active) {
+                        log.warn("inactive entity at index %d is leaving again.", eIdx);
+                    } else {
+                        eState.active = false;
+                        newFrame.setState(eState, eIdx);
+                        //evLeft.raise(entities[eIdx]);
+                    }
+                    if (updateType == 3) {
+                        //evDeleted.raise(entities[eIdx]);
+                        newFrame.setState(null, eIdx);
                     }
 
                     break;
             }
 
+            eIdx++;
         }
 
         if (engineType.handleDeletions() && message.getIsDelta()) {
@@ -311,14 +314,18 @@ public class Entities {
         Iterator<ClientFrame> iter = clientFrames.iterator();
         while(iter.hasNext()) {
             ClientFrame frame = iter.next();
-            if (frame.tick >= message.getDeltaFrom()) {
+            if (frame.getTick() >= message.getDeltaFrom()) {
                 break;
             }
-            log.debug("deleting client frame for tick %d", frame.tick);
+            log.debug("deleting client frame for tick %d", frame.getTick());
             iter.remove();
         }
 
         clientFrames.add(newFrame);
+
+        for (int i = 0; i < entities.length; i++) {
+            entities[i].updateClientFrame(newFrame);
+        }
 
         evUpdatesCompleted.raise();
     }
